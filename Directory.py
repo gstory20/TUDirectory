@@ -58,7 +58,7 @@ with open('customexport.csv') as csvfile:
     rdr = csv.DictReader(csvfile)
     for row in rdr:
         rowNum=rowNum+1 # no friggin increment?!
-        if (row['Account Status'] != 'Active') :        # or row['Member Status'] != 'Active'): 
+        if (row['Account Status'] != 'Active') :        # or row['Member Status'] != 'Active'):
              continue   # ignore entry if hidden
         # If new account
         if (row['Email'] != currAcct):
@@ -79,21 +79,25 @@ with open('customexport.csv') as csvfile:
             #else : acctPType = 'WHOOPS! ' + acctType   ????
             if (inDir):
                 # Save last acct OwnerNames, Address, Email, Phone, acctType, and child first names & birth mo/yr
-                gmOut.write(acctPName + " \t" + addr + " \t" + phone + ' \t'+ acctPType + "\r")
+                varTab = " \t"
+                if len(acctPName) < 16 : varTab = " \t\t\t\t"
+                elif len(acctPName) < 24 : varTab = " \t\t\t"
+                elif len(acctPName) < 32 : varTab = " \t\t"
+                gmOut.write(acctPName + varTab + addr + " \t" + phone + ' \t'+ acctPType + "\r")
                 kidlist = ''
                 if (kidCount > 0):
                     for kid in kids: kidlist = kidlist + kid + " "
                     gmOut.write(kidlist + ' \t' + cityZip + ' \t' + email + "\r")
-                else : gmOut.write('\t\t\t' + cityZip + ' \t' + email + "\r")
+                else : gmOut.write('\t\t\t\t\t' + cityZip + ' \t' + email + "\r")
                 gmOut.write("\r")       # just a separator line
                 if (blockNum != 0):
-                    if (kidCount == 0) : 
+                    if (kidCount == 0) :
                         # Save block info (all but email?)
                         blocks[blockNum-1] = blocks[blockNum-1] + addr + ' \t' + acctPName + " \t" + phone + " \t" + acctPType + "\r"
                     else :
                         blocks[blockNum-1] = blocks[blockNum-1] + addr + ' \t' + acctPName + " \t" + phone + " \t" + acctPType + "\r\t\t" + kidlist + '\r'
                 #
-            else: 
+            else:
                 while redirCount > 0 :           # gotta be a better way to do this, but...
                     del redirects[-1]
                     redirCount = redirCount-1
@@ -105,12 +109,37 @@ with open('customexport.csv') as csvfile:
             kids = ['','','','','','','','','','','','']
             currAcct = row['Email']
             acct1stName = row['Acct. First Name'].strip()
+            if (acct1stName.find(" ") == -1 and acct1stName.find("-") == -1) : acct1stName = acct1stName.capitalize()
             acctLastName = row['Acct. Last Name'].strip()
+            if (acctLastName.find(" ") == -1 and acctLastName.find("-") == -1) : acctLastName = acctLastName.capitalize()
             acctPName = acctLastName + ", " + acct1stName
             # Get account level params
-            addr = row['Address'] 
-            cityZip = row['City'] + ' ' + row['Zip']
+            addr = row['Address']
+            # format street addr: cap only 1st letter of each word, and abbreviate where possible
+            awords = addr.split()
+            addr = ''
+            for word in awords :
+                # cap 1st letter and all rest lower case
+                if (word != 'PO') : word = word.capitalize()
+                # abbreviate Street, Drive, ...
+                if (word == 'Drive') : word = 'Dr'
+                elif (word == 'Street') : word = 'St'
+                elif (word == 'Court') : word = 'Ct'
+                elif (word == 'Avenue') : word = 'Av'
+                elif (word == 'Place') : word = 'Pl'
+                elif (word == 'Circle') : word = 'Cir'
+                elif (word == 'Road') : word = 'Rd'
+                # now put addr back together again
+                addr = addr + word + ' '
+            cWords = row['City'].split()
+            city = ''
+            for word in cWords :
+                city = city + word.capitalize() + ' '
+            cityZip = city + ' ' + row['Zip']
             phone = row['Home Phone']
+            # clean up phone formatting
+            if (len(phone) == 10 and phone.isdigit()) :
+                phone = '(' + phone[0:3] + ') ' + phone[3:6] + '-' + phone[6:10]
             if (row['Email Valid'] == 'Yes'):  email = row['Email']
             else:  email = ' - '
             # get Block Number into blockNum - if it's valid (assuming block# applied to all residents)
@@ -135,7 +164,9 @@ with open('customexport.csv') as csvfile:
             else:  acctType = 'Nonmember'
         # gather up params
         mem1stName = row['Memb. First Name'].strip()
+        if (mem1stName.find(" ") == -1 and mem1stName.find("-") == -1) : mem1stName = mem1stName.capitalize()
         memLastName = row['Memb. Last Name'].strip()
+        if (memLastName.find(" ") == -1 and memLastName.find("-") == -1) : memLastName = memLastName.capitalize()
         # if dup kid name, ignore
         for kname in kids :
             if (mem1stName in kname): continue
@@ -147,7 +178,7 @@ with open('customexport.csv') as csvfile:
         monthOfBirth = dList[0]
         byear = dList[2]
         yob = int(dList[2])
-        
+
         # next determine if spouse with different last name
         # year check is for weird people that give their children blended last names
         if (memLastName.lower() != acctLastName.lower() and (yearBlank or currYear-yob >= 30)):
@@ -166,24 +197,29 @@ with open('customexport.csv') as csvfile:
         # now check if parent by 1st name match
         elif ((mem1stName.lower() in acct1stName.lower()) and (yearBlank or currYear - yob >= 30)):
             # probably parent, unless child name matches/part of parent and year blank - sigh
+            # so just leave acct name as is
             junk = 0            # no action, but that's not allowed in python??
         # else check for kid - almost certainly if yob<30, else (dob blank) guessing
-        elif (yearBlank or (currYear - yob) < 30):
+        # try for case of parent not in acct name
+        elif (currYear - yob >= 30) : # and not '&' in acct1stName:
+            # add (hopefully) parent to acctName
+            acctPName = acctPName + " & " + mem1stName
+        # Assume no bday = adult - alas some known kids with no bday but ...
+        elif yearBlank :
+            acctPName = acctPName + " & " + mem1stName
+        elif ((currYear - yob) < 30):
             # kid (hopefully) so add to record with birth month/year
             kids[kidCount] = mem1stName + " " + monthOfBirth + '/' + byear
             kidCount = kidCount+1
-        # try for case of parent not in acct name
-        elif (currYear - yob >= 30) and not '&' in acct1stName:
-            # add (hopefully) parent to acctName
-            acctPName = acctPName + " & " +mem1stName
-        #if (acctLastName == "Brodt") : break   # for testing purposes - short printout
+        #if (acctLastName == "goodrich") : break # for testing purposes - short printout
+        #print('kidCount=', kidCount, " : ", kids[kidCount-1])
     # end of (input) rows
     gmOut.close()
     with open('blocksOut.txt', mode='w') as blkout:
         for i in range(len(blocks)): blkout.write("Block "+ repr(i+1) + "\r" + blocks[i] + "\r")
     blkout.close()
     with open('redirects.txt', mode='w') as redirOut:
-        for i in redirects: 
+        for i in redirects:
             redirOut.write(i)
             redirOut.write("\r")
     redirOut.close()
